@@ -57,9 +57,6 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <thread>
 #include <mutex>
 #include <condition_variable>
-#ifndef TORRENT_DISABLE_POOL_ALLOCATOR
-#include <boost/pool/pool.hpp>
-#endif
 #include <atomic>
 
 #include "libtorrent/aux_/disable_warnings_pop.hpp"
@@ -100,7 +97,7 @@ namespace libtorrent
 		bool need_readback;
 	};
 
-	typedef tailqueue<disk_io_job> jobqueue_t;
+	using jobqueue_t = tailqueue<disk_io_job>;
 
 	// this struct holds a number of statistics counters
 	// relevant for the disk io thread and disk cache.
@@ -416,8 +413,8 @@ namespace libtorrent
 		int do_rename_file(disk_io_job* j, jobqueue_t& completed_jobs);
 		int do_stop_torrent(disk_io_job* j, jobqueue_t& completed_jobs);
 		int do_read_and_hash(disk_io_job* j, jobqueue_t& completed_jobs);
-#ifndef TORRENT_NO_DEPRECATE
 		int do_cache_piece(disk_io_job* j, jobqueue_t& completed_jobs);
+#ifndef TORRENT_NO_DEPRECATE
 		int do_finalize_file(disk_io_job* j, jobqueue_t& completed_jobs);
 #endif
 		int do_flush_piece(disk_io_job* j, jobqueue_t& completed_jobs);
@@ -463,11 +460,18 @@ namespace libtorrent
 		{
 			// the do_* functions can return this to indicate the disk
 			// job did not complete immediately, and shouldn't be posted yet
+			// this is done when a job is hung on a piece to be completed when the
+			// corresponding piece is flushed to or read from disk.
 			defer_handler = -200,
 
 			// the job cannot be completed right now, put it back in the
 			// queue and try again later
-			retry_job = -201
+			retry_job = -201,
+
+			// if a job needs to allocate a disk buffer, but the cache is full, it
+			// can return this code. It will be put on a queue and re-issued once
+			// there is free slots in the cache.
+			need_disk_buffer = -202
 		};
 
 		// returns true if the thread should exit
@@ -534,7 +538,7 @@ namespace libtorrent
 
 		int try_flush_hashed(cached_piece_entry* p, int cont_blocks, jobqueue_t& completed_jobs, std::unique_lock<std::mutex>& l);
 
-		void try_flush_write_blocks(int num, jobqueue_t& completed_jobs, std::unique_lock<std::mutex>& l);
+		int try_flush_write_blocks(int num, jobqueue_t& completed_jobs, std::unique_lock<std::mutex>& l);
 
 		// used to batch reclaiming of blocks to once per cycle
 		void commit_reclaimed_blocks();
@@ -569,6 +573,7 @@ namespace libtorrent
 		disk_io_thread_pool m_generic_threads;
 		job_queue m_hash_io_jobs;
 		disk_io_thread_pool m_hash_threads;
+		jobqueue_t m_waiting_for_buffer;
 
 		aux::session_settings m_settings;
 
