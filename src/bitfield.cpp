@@ -194,6 +194,7 @@ namespace libtorrent
 	int bitfield::find_first_set() const
 	{
 		const int words = num_words();
+		if (words == 0) return -1;
 		std::uint32_t const* const ptr = &m_buf[1];
 		for (int i = 0; i < words; ++i)
 		{
