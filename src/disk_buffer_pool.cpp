@@ -72,10 +72,8 @@ namespace libtorrent
 		, m_in_use(0)
 		, m_max_size(64)
 		, m_low_watermark((std::max)(m_max_size - 32, 0))
-		, m_high_watermark((std::max)(m_max_size - 16, 0))
 		, m_highest_allocated(0)
 		, m_trigger_cache_trim(trigger_trim)
-		, m_exceeded_max_size(false)
 		, m_ios(ios)
 		, m_cache_pool(nullptr)
 		, m_pool_size(0)
@@ -102,11 +100,10 @@ namespace libtorrent
 
 		std::unique_lock<std::mutex> l(m_pool_mutex);
 
-		if (m_exceeded_max_size)
-			ret = m_in_use - (std::min)(m_low_watermark, int(m_max_size - m_observers.size()*2));
+		if (m_in_use + num_needed < m_low_watermark)
+			return 0;
 
-		if (m_in_use + num_needed > m_max_size)
-			ret = (std::max)(ret, int(m_in_use + num_needed - m_max_size));
+		ret = (std::max)(ret, int(m_in_use + num_needed - m_low_watermark));
 
 		if (ret < 0) ret = 0;
 		else if (ret > m_in_use) ret = m_in_use;
@@ -121,9 +118,7 @@ namespace libtorrent
 	void disk_buffer_pool::check_buffer_level(std::unique_lock<std::mutex>& l)
 	{
 		TORRENT_ASSERT(l.owns_lock());
-		if (!m_exceeded_max_size || m_in_use > m_low_watermark) return;
-
-		m_exceeded_max_size = false;
+		if (m_in_use < m_low_watermark) return;
 
 		std::vector<boost::weak_ptr<disk_observer>> cbs;
 		m_observers.swap(cbs);
@@ -158,23 +153,15 @@ namespace libtorrent
 		return allocate_buffer_impl(l, category);
 	}
 
-	// we allow allocating more blocks even after we exceed the max size,
-	// but communicate back to the allocator (typically the peer_connection)
-	// that we have exceeded the limit via the out-parameter "exceeded". The
-	// caller is expected to honor this by not allocating any more buffers
-	// until the disk_observer object (passed in as "o") is invoked, indicating
-	// that there's more room in the pool now. This caps the amount of over-
-	// allocation to one block per peer connection.
-	char* disk_buffer_pool::allocate_buffer(bool& exceeded
-		, boost::shared_ptr<disk_observer> o, char const* category)
+	// If there's no space left in the buffer pool, nullptr will be returned and
+	// the the disk_observer object (passed in as "o") will be invoked once a
+	// buffer is available
+	char* disk_buffer_pool::allocate_buffer(
+		boost::shared_ptr<disk_observer> o, char const* category)
 	{
 		std::unique_lock<std::mutex> l(m_pool_mutex);
 		char* ret = allocate_buffer_impl(l, category);
-		if (m_exceeded_max_size)
-		{
-			exceeded = true;
-			if (o) m_observers.push_back(o);
-		}
+		if (ret == nullptr && o) m_observers.push_back(o);
 		return ret;
 	}
 
@@ -224,18 +211,16 @@ namespace libtorrent
 			if (ec) return nullptr;
 		}
 
-		if (m_in_use >= m_high_watermark && !m_exceeded_max_size)
-		{
-			m_exceeded_max_size = true;
-			m_trigger_cache_trim();
-		}
-
 		// TODO: 2 this could probably be optimized by keeping an index to the first
 		// known free block. Every time a block is freed with a lower index, it's
 		// updated. When that block is allocated, the cursor is cleared.
 		int const slot_index = m_free_blocks.find_first_set();
+		if (slot_index < 0)
+		{
+			m_trigger_cache_trim();
+			return nullptr;
+		}
 		TORRENT_ASSERT(m_free_blocks.get_bit(slot_index) == true);
-		if (slot_index < 0) return nullptr;
 		m_free_blocks.clear_bit(slot_index);
 
 		if (slot_index > m_highest_allocated)
@@ -316,7 +301,7 @@ namespace libtorrent
 #pragma warning(pop)
 #endif // _MSC_VER
 		{
-			m_max_size = (std::min)(2 * 1024 * 1024 * 3 / 4 * 1024
+			m_max_size = (std::min)(1 * 1024 * 1024 * 3 / 4 * 1024
 				/ m_block_size, m_max_size);
 		}
 
@@ -326,20 +311,7 @@ namespace libtorrent
 		// and the network thread.
 		if (m_max_size < 4) m_max_size = 4;
 
-		int const max_queued_blocks = (std::max)(1
-			, sett.get_int(settings_pack::max_queued_disk_bytes)
-			/ m_block_size);
-
-		m_low_watermark = m_max_size - max_queued_blocks;
-		if (m_low_watermark < 0) m_low_watermark = 0;
-		m_high_watermark = m_max_size - max_queued_blocks / 2;
-		if (m_high_watermark < 0) m_high_watermark = 0;
-
-		if (m_in_use >= m_max_size && !m_exceeded_max_size)
-		{
-			m_exceeded_max_size = true;
-			m_trigger_cache_trim();
-		}
+		m_low_watermark = (std::max)(m_max_size - 32, 0);
 
 #if TORRENT_USE_ASSERTS
 		m_settings_set = true;

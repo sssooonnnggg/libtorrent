@@ -68,7 +68,7 @@ namespace libtorrent
 #endif
 
 		char* allocate_buffer(char const* category);
-		char* allocate_buffer(bool& exceeded, boost::shared_ptr<disk_observer> o
+		char* allocate_buffer(boost::shared_ptr<disk_observer> o
 			, char const* category);
 		void free_buffer(char* buf);
 		void free_multiple_buffers(char** bufvec, int numbufs);
@@ -86,7 +86,11 @@ namespace libtorrent
 			return m_in_use;
 		}
 		std::uint32_t num_to_evict(int num_needed = 0);
-		bool exceeded_max_size() const { return m_exceeded_max_size; }
+		std::uint32_t available() const
+		{
+			std::unique_lock<std::mutex> l(m_pool_mutex);
+			return m_max_size - m_in_use;
+		}
 
 		void set_settings(aux::session_settings const& sett, error_code& ec);
 
@@ -108,13 +112,8 @@ namespace libtorrent
 		// cache size limit
 		int m_max_size;
 
-		// if we have exceeded the limit, we won't notify peers of allowing
-		// allocations again until we drop below this low watermark
+		// if we have exceeded the limit we'll start to actively evict pieces
 		int m_low_watermark;
-
-		// if we exceed this limit, we start telling peers we're full and that
-		// they should wait for notifications of being able to allocate new blocks
-		int m_high_watermark;
 
 		// this is the highest indexed allocated block. Every now and then this is
 		// recalculated by scanning m_free_blocks
@@ -128,9 +127,6 @@ namespace libtorrent
 
 		// callback used to tell the cache it needs to free up some blocks
 		boost::function<void()> m_trigger_cache_trim;
-
-		// set to true to throttle more allocations
-		bool m_exceeded_max_size;
 
 		// this is the main thread io_service. Callbacks are
 		// posted on this in order to have them execute in

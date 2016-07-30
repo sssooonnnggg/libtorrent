@@ -353,16 +353,12 @@ namespace libtorrent
 		void free_disk_buffer(char* buf) override { m_disk_cache.free_buffer(buf); }
 		disk_buffer_holder allocate_disk_buffer(char const* category) override
 		{
-			bool exceed = false;
-			return allocate_disk_buffer(exceed, boost::shared_ptr<disk_observer>(), category);
+			return allocate_disk_buffer(boost::shared_ptr<disk_observer>(), category);
 		}
 
 		void trigger_cache_trim();
-		disk_buffer_holder allocate_disk_buffer(bool& exceeded, boost::shared_ptr<disk_observer> o
+		disk_buffer_holder allocate_disk_buffer(boost::shared_ptr<disk_observer> o
 			, char const* category) override;
-
-		bool exceeded_cache_use() const
-		{ return m_disk_cache.exceeded_max_size(); }
 
 		void update_stats_counters(counters& c) const override;
 		void get_cache_info(cache_status* ret, bool no_pieces = true

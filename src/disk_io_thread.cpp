@@ -1061,7 +1061,7 @@ namespace libtorrent
 
 		// if we have jobs waiting for disk buffers to free up, add them back to
 		// the job queue now, since some were freed
-		if (num_evicted > 0)
+		if (m_disk_cache.available() > 0)
 		{
 			std::unique_lock<std::mutex> l2(m_job_mutex);
 			if (!m_waiting_for_buffer.empty())
@@ -1106,12 +1106,20 @@ namespace libtorrent
 		m_stats_counters.inc_stats_counter(counters::num_running_disk_jobs, 1);
 
 		// call disk function
-		int ret = (this->*(job_functions[j->action]))(j, completed_jobs);
+		int const ret = (this->*(job_functions[j->action]))(j, completed_jobs);
 
 		// note that -2 erros are OK
 		TORRENT_ASSERT(ret != -1 || (j->error.ec && j->error.operation != 0));
 
 		m_stats_counters.inc_stats_counter(counters::num_running_disk_jobs, -1);
+
+		if (ret == need_disk_buffer)
+		{
+			std::unique_lock<std::mutex> l2(m_job_mutex);
+			// this job failed because we're out of memory. We hang it on this
+			// queue to be re-run once at least one disk cache block frees up.
+			m_waiting_for_buffer.push_back(j);
+		}
 
 		std::unique_lock<std::mutex> l(m_cache_mutex);
 		if (m_cache_check_state == cache_check_idle)
@@ -1132,10 +1140,6 @@ namespace libtorrent
 
 		if (ret == need_disk_buffer)
 		{
-			std::unique_lock<std::mutex> l2(m_job_mutex);
-			// this job failed because we're out of memory. We hang it on this
-			// queue to be re-run once at least one disk cache block frees up.
-			m_waiting_for_buffer.push_back(j);
 			return;
 		}
 		else if (ret == retry_job)
@@ -3373,11 +3377,11 @@ namespace libtorrent
 		submit_jobs();
 	}
 
-	disk_buffer_holder disk_io_thread::allocate_disk_buffer(bool& exceeded
-		, boost::shared_ptr<disk_observer> o
+	disk_buffer_holder disk_io_thread::allocate_disk_buffer(
+		boost::shared_ptr<disk_observer> o
 		, char const* category)
 	{
-		char* ret = m_disk_cache.allocate_buffer(exceeded, o, category);
+		char* ret = m_disk_cache.allocate_buffer(o, category);
 		return disk_buffer_holder(*this, ret);
 	}
 
