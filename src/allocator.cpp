@@ -111,17 +111,17 @@ namespace libtorrent
 		void* ret;
 #if TORRENT_HAVE_MMAP
 
-		int const flags = MAP_PRIVATE | MAP_ANON
+		int const flags = MAP_PRIVATE | MAP_ANONYMOUS
 #ifdef MAP_NOCORE
 		// BSD has a flag to exclude this region from core files
 			MAP_NOCORE
 #endif
 			;
 
-		ret = mmap(0, bytes, PROT_READ | PROT_WRITE, flags, 0, 0);
+		ret = mmap(0, bytes, PROT_READ | PROT_WRITE, flags, -1, 0);
 		if (ret == map_failed) return nullptr;
 #elif TORRENT_USE_VIRTUAL_ALLOC
-		ret = VirtualAlloc(nullptr, bytes, MEM_RESERVE, PAGE_READWRITE);
+		ret = VirtualAlloc(nullptr, bytes, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 #elif defined TORRENT_BEOS
 		area_id id = create_area("", &ret, B_ANY_ADDRESS
 			, (bytes + page_size() - 1) & (page_size()-1), B_NO_LOCK, B_READ_AREA | B_WRITE_AREA);
