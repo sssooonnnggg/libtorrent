@@ -1105,8 +1105,7 @@ namespace libtorrent
 		read_fileop op(*this, flags);
 
 #ifdef TORRENT_SIMULATE_SLOW_READ
-		boost::thread::sleep(boost::get_system_time()
-			+ boost::posix_time::milliseconds(1000));
+		std::this_thread::sleep_for(seconds(1));
 #endif
 		return readwritev(files(), bufs, piece, offset, num_bufs, op, ec);
 	}

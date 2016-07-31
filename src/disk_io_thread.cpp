@@ -1101,7 +1101,7 @@ namespace libtorrent
 
 		TORRENT_ASSERT(j->action < sizeof(job_functions)/sizeof(job_functions[0]));
 
-		time_point start_time = clock_type::now();
+		time_point const start_time = clock_type::now();
 
 		m_stats_counters.inc_stats_counter(counters::num_running_disk_jobs, 1);
 
@@ -1182,20 +1182,20 @@ namespace libtorrent
 			return need_disk_buffer;
 		}
 
-		time_point start_time = clock_type::now();
+		time_point const start_time = clock_type::now();
 
 		int const file_flags = file_flags_for_job(j
 			, m_settings.get_bool(settings_pack::coalesce_reads));
 		file::iovec_t b = { j->buffer.disk_block, size_t(j->d.io.buffer_size) };
 
-		int ret = j->storage->get_storage_impl()->readv(&b, 1
+		int const ret = j->storage->get_storage_impl()->readv(&b, 1
 			, j->piece, j->d.io.offset, file_flags, j->error);
 
 		TORRENT_ASSERT(ret >= 0 || j->error.ec);
 
 		if (!j->error.ec)
 		{
-			std::uint32_t read_time = total_microseconds(clock_type::now() - start_time);
+			std::uint32_t const read_time = total_microseconds(clock_type::now() - start_time);
 			m_read_time.add_sample(read_time);
 
 			m_stats_counters.inc_stats_counter(counters::num_read_back);
@@ -1209,10 +1209,10 @@ namespace libtorrent
 
 	int disk_io_thread::do_read(disk_io_job* j, jobqueue_t& completed_jobs)
 	{
-		int block_size = m_disk_cache.block_size();
-		int piece_size = j->storage->files()->piece_size(j->piece);
-		int blocks_in_piece = (piece_size + block_size - 1) / block_size;
-		int iov_len = m_disk_cache.pad_job(j, blocks_in_piece
+		int const block_size = m_disk_cache.block_size();
+		int const piece_size = j->storage->files()->piece_size(j->piece);
+		int const blocks_in_piece = (piece_size + block_size - 1) / block_size;
+		int const iov_len = m_disk_cache.pad_job(j, blocks_in_piece
 			, m_settings.get_int(settings_pack::read_cache_line_size));
 
 		file::iovec_t* iov = TORRENT_ALLOCA(file::iovec_t, iov_len);
@@ -2222,7 +2222,7 @@ namespace libtorrent
 
 		file::iovec_t iov;
 		iov.iov_base = m_disk_cache.allocate_buffer("hashing");
-		if (iov.iov_base == NULL) return need_disk_buffer;
+		if (iov.iov_base == nullptr) return need_disk_buffer;
 		hasher h;
 		int ret = 0;
 		int offset = 0;
@@ -2409,6 +2409,8 @@ namespace libtorrent
 						m_disk_cache.dec_block_refcount(pe, locked_blocks[k], block_cache::ref_hashing);
 
 					--pe->piece_refcount;
+
+					pe->hashing = 0;
 
 					// the only state we've changed so far is to progress the sha-1
 					// cursor. It's safe to retry this job later, once there's a
@@ -3382,6 +3384,7 @@ namespace libtorrent
 		, char const* category)
 	{
 		char* ret = m_disk_cache.allocate_buffer(o, category);
+		TORRENT_ASSERT(ret != nullptr);
 		return disk_buffer_holder(*this, ret);
 	}
 
