@@ -112,8 +112,13 @@ namespace libtorrent
 		// cache size limit
 		int m_max_size;
 
-		// if we have exceeded the limit we'll start to actively evict pieces
+		// if we have exceeded the limit, we won't notify peers of allowing
+		// allocations again until we drop below this low watermark
 		int m_low_watermark;
+
+		// if we exceed this limit, we start telling peers we're full and that
+		// they should wait for notifications of being able to allocate new blocks
+		int m_high_watermark;
 
 		// this is the highest indexed allocated block. Every now and then this is
 		// recalculated by scanning m_free_blocks
@@ -127,6 +132,9 @@ namespace libtorrent
 
 		// callback used to tell the cache it needs to free up some blocks
 		boost::function<void()> m_trigger_cache_trim;
+
+		// set to true to throttle more allocations
+		bool m_exceeded_max_size;
 
 		// this is the main thread io_service. Callbacks are
 		// posted on this in order to have them execute in

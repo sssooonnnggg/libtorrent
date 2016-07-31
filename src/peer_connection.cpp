@@ -2603,6 +2603,9 @@ namespace libtorrent
 	void peer_connection::incoming_piece(peer_request const& p, char const* data)
 	{
 		TORRENT_ASSERT(is_single_thread());
+
+		TORRENT_ASSERT((m_channel_state[download_channel] & peer_info::bw_disk) == 0);
+
 		disk_buffer_holder buffer
 			= m_allocator.allocate_disk_buffer(self(), "receive buffer");
 
