@@ -171,13 +171,17 @@ namespace libtorrent
 
 	void page_dont_need(char* const block, std::int64_t const size)
 	{
-
 #if TORRENT_USE_MADVISE && defined MADV_FREE
 		madvise(block, size, MADV_FREE);
-#elif TORRENT_USE_MADVISE && defined TORRENT_LINUX
-		madvise(block, size, MADV_DONTNEED);
+//#elif TORRENT_USE_MADVISE && defined TORRENT_LINUX
+//		madvise(block, size, MADV_DONTNEED);
 #elif TORRENT_USE_VIRTUAL_ALLOC
-		VirtualFree(block, size, MEM_DECOMMIT);
+		// TODO: 3 MEM_DECOMMIT will not only reove the physical storage behind
+		// these virtual addresses, it will also disconnect it from *potential
+		// storage*, meaning any futer access to this address range will cause a
+		// segmentation fauls (as opposed to a page fault and have the kernel
+		// populate it with a new page)
+//		VirtualFree(block, size, MEM_DECOMMIT);
 #endif
 	}
 }
