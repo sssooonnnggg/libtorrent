@@ -74,7 +74,6 @@ namespace libtorrent
 				ret += 32;
 				continue;
 			}
-
 #if TORRENT_HAS_BUILTIN_CLZ
 			return ret + __builtin_clz(v);
 #elif TORRENT_HAS_SSE && defined _MSC_VER
@@ -95,7 +94,7 @@ namespace libtorrent
 			v |= v >> 8;
 			v |= v >> 16;
 
-			return ret + MultiplyDeBruijnBitPosition[
+			return ret + 31 - MultiplyDeBruijnBitPosition[
 				static_cast<std::uint32_t>(v * 0x07C4ACDDU) >> 27];
 #endif
 		}

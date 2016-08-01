@@ -216,6 +216,10 @@ namespace libtorrent
 			}
 #endif
 
+#if TORRENT_HAS_BUILTIN_CLZ
+			return i * 32 + __builtin_clz(v);
+#else
+
 			// http://graphics.stanford.edu/~seander/bithacks.html#IntegerLogObvious
 			static const int MultiplyDeBruijnBitPosition[32] =
 			{
@@ -229,7 +233,9 @@ namespace libtorrent
 			v |= v >> 8;
 			v |= v >> 16;
 
-			return i * 32 + MultiplyDeBruijnBitPosition[static_cast<uint32_t>(v * 0x07C4ACDDU) >> 27];
+			return i * 32 + 31 - MultiplyDeBruijnBitPosition[
+				static_cast<uint32_t>(v * 0x07C4ACDDU) >> 27];
+#endif
 		}
 		return -1;
 	}
@@ -266,7 +272,7 @@ namespace libtorrent
 
 			for (int k = 0; k < 32; ++k, last >>= 1)
 			{
-				if ((last & 1) == 1) continue;
+				if ((last & 1) == 0) continue;
 				return i * 32 + 31 - k;
 			}
 			TORRENT_ASSERT_FAIL();
@@ -296,7 +302,7 @@ namespace libtorrent
 
 			for (int k = 0; k < 32; ++k, v >>= 1)
 			{
-				if ((v & 1) == 1) continue;
+				if ((v & 1) == 0) continue;
 				return i * 32 + 31 - k;
 			}
 		}
