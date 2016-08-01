@@ -111,7 +111,7 @@ namespace libtorrent
 		void* ret;
 #if TORRENT_HAVE_MMAP
 
-		int const flags = MAP_PRIVATE | MAP_ANONYMOUS
+		int const flags = MAP_PRIVATE | MAP_ANON
 #ifdef MAP_NOCORE
 		// BSD has a flag to exclude this region from core files
 			MAP_NOCORE
