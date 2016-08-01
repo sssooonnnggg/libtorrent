@@ -171,6 +171,8 @@ namespace libtorrent
 
 	void page_dont_need(char* const block, std::int64_t const size)
 	{
+		TORRENT_UNUSED(block);
+		TORRENT_UNUSED(size);
 #if TORRENT_USE_MADVISE && defined MADV_FREE
 		madvise(block, size, MADV_FREE);
 //#elif TORRENT_USE_MADVISE && defined TORRENT_LINUX
