@@ -94,11 +94,19 @@ TORRENT_TEST(direct_dht_request)
 	sp.set_bool(settings_pack::enable_lsd, false);
 	sp.set_bool(settings_pack::enable_natpmp, false);
 	sp.set_bool(settings_pack::enable_upnp, false);
+	sp.set_bool(settings_pack::enable_dht, false);
 	sp.set_int(settings_pack::max_retry_port_bind, 800);
 	sp.set_str(settings_pack::listen_interfaces, "127.0.0.1:42434");
 	lt::session responder(sp, 0);
 	sp.set_str(settings_pack::listen_interfaces, "127.0.0.1:45434");
 	lt::session requester(sp, 0);
+
+	// by enabling the dht after creating the session, it won't add the
+	// additional bootstrap node and the DHT will start immediately, without a
+	// DNS lookup
+	sp.set_bool(settings_pack::enable_dht, true);
+	requester.apply_settings(sp);
+	responder.apply_settings(sp);
 
 	responder.add_extension(boost::static_pointer_cast<plugin>(boost::make_shared<test_plugin>()));
 
@@ -116,6 +124,7 @@ TORRENT_TEST(direct_dht_request)
 		bdecode_node response = ra->response();
 		TEST_EQUAL(ra->addr.address(), address::from_string("127.0.0.1"));
 		TEST_EQUAL(ra->addr.port(), responder.listen_port());
+		TEST_EQUAL(response.type(), bdecode_node::dict_t);
 		TEST_EQUAL(response.dict_find_dict("r").dict_find_int_value("good"), 1);
 		TEST_EQUAL(ra->userdata, (void*)12345);
 	}
