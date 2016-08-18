@@ -218,8 +218,14 @@ TORRENT_TEST(default_set_custom)
 {
 	g_storage_constructor_invoked = false;
 	settings_pack p;
-	p.set_bool(settings_pack::enable_dht, true);
+
+	// disable the DHT at first, to avoid adding the default bootstrap node
+	p.set_bool(settings_pack::enable_dht, false);
 	lt::session ses(p);
+
+	// now we can start it without bootstrapping
+	p.set_bool(settings_pack::enable_dht, true);
+	ses.apply_settings(p);
 
 	bool r = ses.is_dht_running();
 	TEST_CHECK(r);
