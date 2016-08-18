@@ -473,17 +473,6 @@ namespace aux {
 			m_alerts.set_alert_mask(pack.get_int(settings_pack::alert_mask));
 		}
 
-#ifndef TORRENT_DISABLE_DHT
-		if (!pack.has_val(settings_pack::enable_dht)
-			|| pack.get_bool(settings_pack::enable_dht) == true)
-		{
-			// if the DHT is enabled on startup, there's currently no way to add
-			// router nodes early enough for them to be used by the DHT bootstrap
-			// add the default libtorrent router
-			add_dht_router(std::pair<std::string, int>("dht.libtorrent.org", 25401));
-		}
-#endif
-
 #ifndef TORRENT_DISABLE_LOGGING
 		session_log("start session");
 #endif
@@ -644,6 +633,7 @@ namespace aux {
 		update_lsd();
 		update_dht();
 		update_peer_fingerprint();
+		update_dht_bootstrap_nodes();
 
 		if (m_listen_sockets.empty())
 		{
@@ -5487,6 +5477,20 @@ retry:
 		{
 			url_random(m_peer_id.data() + print.length(), m_peer_id.data() + 20);
 		}
+	}
+
+	void session_impl::update_dht_bootstrap_nodes()
+	{
+#ifndef TORRENT_DISABLE_DHT
+		std::string const& node_list = m_settings.get_str(settings_pack::dht_bootstrap_nodes);
+		std::vector<std::pair<std::string, int> > nodes;
+		parse_comma_separated_string_port(node_list, nodes);
+
+		for (int i = 0; i < nodes.size(); ++i)
+		{
+			add_dht_router(nodes[i]);
+		}
+#endif
 	}
 
 	void session_impl::update_count_slow()
