@@ -473,6 +473,15 @@ namespace aux {
 			m_alerts.set_alert_mask(pack.get_int(settings_pack::alert_mask));
 		}
 
+		if (!pack.has_val(settings_pack::enable_dht)
+			|| pack.get_bool(settings_pack::enable_dht) == true)
+		{
+			// if the DHT is enabled on startup, there's currently no way to add
+			// router nodes early enough for them to be used by the DHT bootstrap
+			// add the default libtorrent router
+			add_dht_router(std::pair<std::string, int>("dht.libtorrent.org", 25401));
+		}
+
 #ifndef TORRENT_DISABLE_LOGGING
 		session_log("start session");
 #endif
